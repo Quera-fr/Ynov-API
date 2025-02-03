@@ -53,12 +53,18 @@ def upload_file(file:UploadFile=File(...)):
 
 
 # 0 Chargement du modèle
-import pickle
+
 import pandas as pd
+import mlflow, os
 
 
-with open('model.pkl', 'rb') as f:
-    model = pickle.load(f)
+os.environ['AWS_ACCESS_KEY_ID'] = ""
+os.environ['AWS_SECRET_ACCESS_KEY'] = ""
+
+mlflow.set_tracking_uri("https://quera-server-mlflow-cda209265623.herokuapp.com/")
+
+path = mlflow.MlflowClient().get_registered_model('Ever_Married').latest_versions[0].source
+model = mlflow.pyfunc.load_model(path)
 
 
 
@@ -97,5 +103,28 @@ def predict_file(file:UploadFile=File(...)):
         y_pred = model.predict(X)
         print (y_pred)
         return [int(n) for n in model.predict(X)]
+    
+
+from io import BytesIO
+from PIL import Image
+import numpy as np
 
 
+from io import BytesIO
+from PIL import Image
+import numpy as np
+path = mlflow.MlflowClient().get_registered_model('Tensoflow Model Mnist')._latest_version[0].source
+
+model_loaded = mlflow.pyfunc.load_model(path)
+@app.post('/predict_digit')
+def predict_digit(file:UploadFile=File(...)):
+
+    # Décodage de l'image
+    img = Image.open(BytesIO(file.file.read()))
+
+    # Resize et normalisation de l'image
+    img = (255 - np.array(img.resize((28,28)).convert('L')))/255
+    img = img.reshape(-1, 28,28,1)
+    
+    
+    return {'Prediction': int(model_loaded.predict(img)[0].argmax())}
